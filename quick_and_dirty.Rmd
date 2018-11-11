@@ -304,39 +304,80 @@ plot(as.factor(masterData$switch_goodbad), x= jitter(masterData$noswitch_impact)
 
 Yep, and it seems like one's view on ho wmuch switching helped/hurt performance very much affects whether you think you should have switched. It seems that those who think switching has no affect on performance ALSO think that you shouldn't switch... perhaps peopel only do switch if they think it'll have a positive - rather than nuetral - effect.
 
-```{r}
-switch_on_perf_self_report <- prop.table(table(masterData$noswitch_impact))
 
-```
-This graph paints a similar sotry: most people visually seem to think that not switching helped performance, with people seeming to think that it helped perofrmance by a good amount (i.e. many people responded with a value > 2)
+#### Summary: Movers don't like being swithed on unless they think it'll help performance. Even if switching doesn't affect performance, they usually do NOT want to be switched on 
 
-## 2) Are people a goo djudge of their own performance?
+## 2) How do people judge their performance & their partner's performance?
 ```{r}
 # How good are you at judging your own performance?
 par(mfrow = c(1,2))
 plot(y = masterData$completion_time, x = masterData$self_skill_avg, 
-     main = "Maze performance perc: mover",
-     names = c("same", "less skilled", "more skilled"))
-barplot(table(masterData$self_skill_avg), names = c("same", "less skilled", "more skilled"))
+     main = "Skill level self vs. Avg",
+     names = c("same", "less", "more"),
+     ylab = "Completion time (s)", xlab = "Your skill lvl vs. Avg Joe's")
+barplot(table(masterData$self_skill_avg), names = c("same", "less", "more"),
+        main = "Skill level self vs. Avg Hist", ylab = "# of responses",
+        xlab = "Your skill lvl vs. Avg Joe's")
 par(mfrow = c(1,1))
 ```
 
-Huh! It seems that people are pretty bad at predicting their own performance... people who rate themselves as 'as skilled as most people' and 'more skilled than most people' tend to rate the same way. People who are incompetent, however, have a whole range of beliefs, but to a lot of them, at least they know they're incompetant
+Huh! It seems that people are pretty bad at predicting their own performance... people who rate themselves as 'as skilled as most people' and 'more skilled than most people' tend to complete the maze with similar times. Furthermore, very few people admit they're more skilled than most people, so people tend to be pretty bad estimaters at their own performance.
+
+Most people think they're average, which is not suprrising, since that's something that's been replciated in psychology a lot.
+
+Very very very few people think they're less skilled than average, and the completoin times of those who think they're less ksilled than average varies. Perhaps this is due to the better-than-average effect, where despite being incompetent, you think you're good at the task. 
+
+
 
 ```{r}
-# How do you judge partner's performance?
+# How do you judge partner's performance RELATIVE TO YOURSELF?
 par(mfrow = c(1,2))
 plot(y = masterData$completion_time, x = masterData$partner_skill_you, 
-     main = "Maze performance perc: mover",
-     names = c("same", "less skilled", "more skilled"))
-barplot(table(masterData$partner_skill_you), names = c("same", "less skilled", "more skilled"))
+     main = "Partner Skill Lvl You vs. CTs", xlab = "Partner Skill Lvl vs. You",
+     names = c("equal", "less", "more"), ylab = "Completion time (s)")
+barplot(table(masterData$partner_skill_you), names = c("equal", "less", "more"),
+        main = "Partner Skill Lvl Hist", ylab = "# of responses",
+        xlab = "Partner Skill Lvl vs. You")
 par(mfrow = c(1,1))
 ```
 
-```{r}
 
-# -- 2) Are people good judges of their performance?
-plot(x = masterData$skill_catagory, y = masterData$)
+A sizeable group of relaly bad people think that their partner is better than themselves, which is probably true, since they are really bad at the task. 
+
+Most people, however, think that their partner is as skilled as themselves, while a sizeable minority think that their partner is less skilled than themselves. This seems to be REGARDLESS of performance: even thoguht you might be above/below average (~90s-~100s), this has no infleucne on whether you think your partner is as skilled or less skilled than yoruselfs; your performance has littl bearing on what you think of your partner, barring the fact that you're not outrageously bad at the maze.
+
+In short, people think their partner is as skilled as them.
+
+Let's test out this hypothosis a bit more: does your perception of yoruself (vs. an objective measure of your performance) influence what you think of yoru partner
+
+```{r}
+plot(x = masterData$self_skill_avg_q, y = jitter(masterData$partner_skill_you_q), xlab = "Your performance Perception (-1 = less, 0 = same, 1 = more)", ylab = "Partner Performance vs. You", main = "Partner's skill lvl perc. vs. your skill lvl perception")
+```
+
+Wow - people who say they're really good think their partner is WORSE than them, and people who think they're AVERAGE think their partner is the SAME as them, overall!
+
+Keep in mind though that there is no skill difference between people who said they were very good at the maze vs. average at the maze though. People don't really know how skilled they are, so this self-apprasal is likely becvause of personaly differences or other dispositions.
+
+```{r}
+# How do you judge partner's performance RELATIVE TO THE AVERAGE JOE'S?
+par(mfrow = c(1,2))
+plot(y = masterData$completion_time, x = masterData$partner_skill_avg, 
+     main = "Partner Skill Lvl Avg vs. CTs", xlab = "Partner Skill Lvl vs. Avg Joe's",
+     names = c("equal", "less", "more"), ylab = "Completion time (s)")
+barplot(table(masterData$partner_skill_avg), names = c("equal", "less", "more"),
+        main = "Partner Skill Lvl Hist", ylab = "# of responses",
+        xlab = "Partner Skill Lvl vs. Avg Joe's")
+par(mfrow = c(1,1))
+```
+
+Ok - so the overwhelming majority of people thougth their partner has the same amount of skill as the average person, with a few saying that their partner was less skilled than the average person. No one thougth their partner was better than average, which kind of makes sense since they never saw their performance. 
+
+Your performance also doesn't really seem ot predict how well your partner does on the task, when compared to the average Joe. It should be this way: your oppinion of your partner compared to an abstraction/average shouldn't be influenced by your own performance, so nothing is odd about this data.
+
+#### Summary: (1) People are BAD at predicting how they are at switch tasks, unless you're outrageously bad, because then it's obvious (2) If you think you're GOOD at the task, then you will think your partner is WORSE than you, and if you think you're AVERAGE at the task, then you think your partner is the SAME as you. (3) However, most people are bad at predicting how they are on this task, so this skill appraisal is probably due to personality differences or other factors.
+
+
+```{r}
 # -- 2) Are people good judges of their performance?
 plot(x = masterData$skill_catagory, y = masterData$self_skill_avg)
 # -- 2) Are people good judges of their performance?
