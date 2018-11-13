@@ -3,8 +3,83 @@ title: "quick_and_dirty_monitor"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+## 0) Data Preperation 
+
+```{r}
+#Call any libraries
+library(ggplot2)
+
+#Clean up the dataset
+
+#First, get rid of the technical glitches in which no-one was paired up w/ a parnter.
+moverData <- read.csv("v2_mover_date_master.csv")
+masterData <- read.csv("v2_monitor_data_master.csv")
+tech_excl_before <- nrow(masterData)
+masterData <- masterData[masterData$computer_overall_speed != -1,]
+tech_excl_after <- nrow(masterData)
+
+
+tech_excl_after - tech_excl_before
+```
+
+Good - only 7 people were excluded because they weren't assigned a valid partner.
+
+```{r}
+#Next, let's grab a few of the mover's survey responses...
+
+#First, initialize the new column
+masterData$computer_switch_goodbad <- NA
+
+#Next, go through all the movers and get the ID and VARIABLE o fitnerest
+for(counter in c(1:nrow(moverData))){
+  id_of_interest <- moverData$participant_id[counter]
+  value <- moverData$switch_goodbad[counter]
+  
+  #Now that we have those vlaues, go through each row of our monitor data...  
+  for (counter in c(1:nrow(masterData))){
+    current_id <- masterData$computer_id[counter]
+    
+    #If a match is found, replace that row with the proper value from the previous loop
+    if(current_id == id_of_interest){
+      masterData$computer_switch_goodbad[counter] <- value
+    }
+  }#end of for(masterData)
+}#end of for(moverData)
+
+#Finally, let's recode the variable.
+masterData[masterData$computer_switch_goodbad == 1,]$computer_switch_goodbad <- "Partner didn't want switch"
+masterData[masterData$computer_switch_goodbad == 2,]$computer_switch_goodbad <- "Partner wanted switch"
+```
+
+```{r}
+#Finally, let's exclude other faulty data
+
+#First, exclude those who switched tabs, at it gives away the human-partner illusion
+masterDataExclusions <- subset(masterData, !switched_tabs_critical)
+#Next, exclude those who thought they were paired with a bot.
+masterDataExclusions <- subset(masterDataExclusions, !bot_partner)
+
+nrow(masterData) - nrow(masterDataExclusions)
+```
+
+Wow. 72 exclusions, meaning my sample size should now be around 140.
+
+## 1) How did people perform on the maze? Are there any glitches?
+
+
+
+
+```{r}
+
+ggplot(masterDataExclusions, aes(x = computer_name, y = switch, color = effects_of_switch > 0)) + geom_point(position = position_jitter(w = 0, h = .1)) + facet_wrap(~computer_switch_goodbad, scales="free") + scale_color_manual(values=c("green","red")) + labs(colour = "Switching Hurt Performance?") + xlab("Partner Name") + ylab("Did the switch happen?")
+
+
+
+
 ```
 
 
+
+
+
+DEklokijklkljljkljkljkljjkljklklj
