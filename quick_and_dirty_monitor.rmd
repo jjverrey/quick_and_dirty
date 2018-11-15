@@ -8,6 +8,7 @@ output: html_document
 ```{r}
 #Call any libraries
 library(ggplot2)
+library(nlme)
 
 #Clean up the dataset
 
@@ -23,6 +24,36 @@ tech_excl_after - tech_excl_before
 ```
 
 Good - only 7 people were excluded because they weren't assigned a valid partner.
+
+```{r}
+#Now, let's make some variables
+
+# a) Monitor Z-Scores
+masterData$monitor_completion_time_z <- (masterData$completion_time - mean(masterData$completion_time))/sd(masterData$completion_time)
+
+# b) Mover z-scores. Base it on values FROM moverData and NOT from masterData, as masterData
+# has nested data
+masterData$mover_completion_time_z <- (masterData$computer_solo_time/100 - mean(moverData$completion_time))/sd(moverData$completion_time)
+
+
+
+# Improvement Index - Monitor
+masterData$improvement_index <- 
+  masterData$second_half_avg_speed - masterData$first_half_avg_speed
+
+# Improvement Index - Mover (both datasets)
+masterData$computer_improvement_index <- 
+  masterData$computer_avg_speed_second_half - masterData$computer_avg_speed_first_half
+moverData$improvement_index <- 
+  moverData$second_halv_avg_speed - moverData$first_half_avg_speed
+masterData$computer_improvement_index_z <- (masterData$computer_improvement_index - mean(moverData$improvement_index))/sd(moverData$improvement_index)
+
+
+# Improvement after switch index - Mover (both datasets)
+masterData$computer_post_switch_improvement_index <- 
+  masterData$computer_avg_speed_after_switch - masterData$computer_avg_speed_before_switch
+
+```
 
 ```{r}
 #Next, let's grab a few of the mover's survey responses...
@@ -59,12 +90,178 @@ masterDataExclusions <- subset(masterData, !switched_tabs_critical)
 #Next, exclude those who thought they were paired with a bot.
 masterDataExclusions <- subset(masterDataExclusions, !bot_partner)
 
+#Let's also divide the real data (masterDataExclusions) into movers vs. non-movers
+masterDataExclusions_non_switchers <- 
+  subset(masterDataExclusions, masterDataExclusions$game_mode == 2)
+masterDataExclusions_switchers <- 
+  subset(masterDataExclusions, masterDataExclusions$game_mode == 3)
+
 nrow(masterData) - nrow(masterDataExclusions)
 ```
 
 Wow. 72 exclusions, meaning my sample size should now be around 140.
 
-## 1) How did people perform on the maze? Are there any glitches?
+## 1) How did people perform on the maze? 
+
+### First, let's look at the movers vs. monitors
+```{r}
+par(mfrow = c(2,2))
+#Movers
+boxplot(moverData$completion_time, main = "Dist of Mover Completion Time",
+        ylab = "Completion Time (s)")
+hist(moverData$completion_time, main = "Freq of Mover Completion Time",
+     xlim=c(0,200), xlab = "Completion Time (s)")
+abline(v=mean(moverData$completion_time), col="Red")
+
+#Monitors
+boxplot(masterDataExclusions$completion_time, main = "Dist of monitor Completion Time",
+        ylab = "Completion Time (s)")
+hist(masterDataExclusions$completion_time, main = "Freq of monitor completion Time",
+     xlim=c(0,200), xlab = "Completion Time (s)")
+abline(v=mean(masterDataExclusions$completion_time), col = "Red")
+
+par(mfrow = c(1,1))
+```
+
+How intruiging! Both graphs looks extremely similar, both in terms of mean and in terms of distributions.
+
+```{r}
+mover_mean <- mean(moverData$completion_time)
+monitor_mean <- mean(masterDataExclusions$completion_time)
+
+paste("Mover Mean =", mover_mean, "Monitor Mean =", monitor_mean, sep = " ")
+```
+
+The means are extreme similar; it seems that switching doesn't really effect performance. There's more going on than meets the eye though. How does the performance of switchers compare to that of non switchers
+
+### How does the performance of switchers compare to non-switchers?
+
+```{r}
+par(mfrow=c(2,2))
+barplot(prop.table(table(masterDataExclusions$switch)), ylab = "Proportion", main = "Did the switch happen?")
+boxplot(masterDataExclusions$completion_time ~ masterDataExclusions$switch, main = "Switch vs. no-switch distributions", ylab = "Completion time (s)")
+hist(masterDataExclusions_non_switchers$completion_time, 
+     main = "Freq of monitor completion Time", xlim=c(0,200), xlab = "Completion Time (s)")
+abline(v=mean(masterDataExclusions_non_switchers$completion_time), col = "Red")
+hist(masterDataExclusions_switchers$completion_time, 
+     main = "Freq of monitor completion Time", xlim=c(0,200), xlab = "Completion Time (s)")
+abline(v=mean(masterDataExclusions_switchers$completion_time), col = "Red")
+
+par(mfrow=c(1,1))
+```
+
+```{r}
+switch_mean <- mean(masterDataExclusions_switchers$completion_time)
+no_switchmean <- mean(masterDataExclusions_non_switchers$completion_time)
+
+paste("Switch Mean =", switch_mean, "No Switch Mean =", no_switchmean, 
+      "SD of masterData =", sd(masterDataExclusions$completion_time), sep = " ")
+```
+
+Holy crap! Switching makes yo udo WORSE by 30 seconds!! That's bascially a whole fricken standard deviation!!!
+
+
+```{r}
+#Let's correct for these nasty nested data effects
+mlreg = lme(completion_time ~ switch, data = masterDataExclusions, random=~1|computer_id)
+summary(mlreg)
+```
+
+INCREDIBLE!!!!!! Even when controlling for the nested nature of the data, SWITCHERS DO WORSE THAN NON-SWITCHERS BY A WHOLE 21 SECONDS!!!!!!!!!!!!!!!!!!!!
+
+## 2) Why cuases someone to press the "switch" button?
+
+### Surely it's completion time, or an objectiv emeasure of performance?
+
+```{r}
+par(mfrow=c(1,2))
+
+#Completion Time (s)
+plot(game_mode ~ I(computer_solo_time/100), data = masterDataExclusions, main = "Switching vs. Mover CT", xlab = "Mover Completion Time (s)")
+abline(lm(game_mode ~ I(computer_solo_time/100), data = masterDataExclusions), col = "red")
+
+#Completion Time Zs
+plot(game_mode ~ mover_completion_time_z, data = masterDataExclusions, main = "Switching vs. Mover CT", xlab = "Mover Completion Time (z)")
+abline(lm(game_mode ~ mover_completion_time_z, data = masterDataExclusions), col = "red")
+
+par(mfrow=c(1,1))
+```
+
+
+```{r}
+#Show me the mixed linear effects for Z SCORES!
+mlreg = lme(game_mode ~ mover_completion_time_z, data = masterDataExclusions, random=~1|computer_id)
+summary(mlreg)
+```
+
+No way!!! For every one standard deviation increase in performance (i.e. the user does worse on the maze by 1 sd, meaning the ytake longer to complete it), the user becomes roughly 9% more likely to switch. HOWEVER, THIS EFFECT IS INSIGINIFICANT, even with a sample size of 150 participants!
+
+Short answer: the mover's performance has NOTHING to do with completion time!
+
+### Ok, why don't we look at all the variables together?
+```{r}
+mlreg <- lme(game_mode ~ I(computer_solo_time/100) + computer_total_reset_counter + computer_total_pixel_movement +  computer_overall_speed + computer_improvement_index, data = masterDataExclusions, random=~1|computer_id)
+
+summary(mlreg)
+```
+
+```{r}
+mean(masterDataExclusions$computer_total_reset_counter)
+```
+
+How disappointing: NONE of these values explain why people chose to switch versus not swtich. The only thing that sort of explains it is the computer's total reset counter, but even then, running into a wall only makes one 3% more likely to switch roles PER HIT. The average person htis a wall 3-4 times, so it's not like it has a strong effect.
+
+## 3) WITHIN the switch condition, what are the effects of switching?
+
+### Let's use improvement indexes. First, we need to establish what it means.
+```{r}
+#First of all, let's convert these 'improvement indexes' into meaningful units
+masterDataExclusions_switchers$improvement_index <- 
+  masterDataExclusions_switchers$improvement_index * 1000
+masterDataExclusions_switchers$computer_improvement_index <- 
+  masterDataExclusions_switchers$computer_improvement_index * 1000
+masterDataExclusions_switchers$computer_post_switch_improvement_index<- 
+  masterDataExclusions_switchers$computer_post_switch_improvement_index * 1000
+
+#Next, let's see how this relates to completion_time
+```
+
+```{r}
+par(mfrow=c(1,3))
+#Monitors
+eq <- completion_time ~ improvement_index
+plot(eq , data = masterDataExclusions_switchers, ylab = "Completion Time (s)", xlab = "Improvement Index", main = "Monitors")
+mon_impr_ind_reg <- lm(eq, data = masterDataExclusions_switchers)
+abline(mon_impr_ind_reg, col = "red")
+
+#Movers (Improvement)
+eq <- I(computer_solo_time/100) ~ computer_improvement_index
+plot(eq , data = masterDataExclusions_switchers, ylab = "Completion Time (s)", xlab = "Improvement Index", main = "Movers - Improvement Index")
+mov_impr_ind_reg <- lm(eq, data = masterDataExclusions_switchers)
+abline(mov_impr_ind_reg, col = "red")
+
+#Movers (post-switch)
+eq <- I(computer_solo_time/100) ~ computer_post_switch_improvement_index
+plot(eq , data = masterDataExclusions_switchers, ylab = "Completion Time (s)", xlab = "Post Switch Improvement Index", main = "Movers - Post Switch Improvement Index")
+mov_post_switch_impr_ind_reg <- lm(eq, data = masterDataExclusions_switchers)
+abline(mov_post_switch_impr_ind_reg, col = "red")
+par(mfrow=c(1,1))
+```
+
+Ok - so it looks like that the more you improve, the better your time gets. Let's seeexactly how much
+
+```{r}
+#For computer
+summary(lme(I(computer_solo_time/100) ~ computer_improvement_index, data = masterDataExclusions_switchers, random=~1|computer_id))
+```
+#2) Why do people switch?
+
+
+```{r}
+#Let's correct for these nasty nested data effects
+mlreg = lme(completion_time ~ switch, data = masterDataExclusions, random=~1|computer_id)
+summary(mlreg)
+```
 
 
 
